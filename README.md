@@ -1,53 +1,53 @@
-# Assistente RAG Locale per Documentazione Tecnica (Ollama + ChromaDB)
+# Local Technical Documentation RAG Assistant (Ollama + ChromaDB)
 
-Sistema **Retrieval-Augmented Generation (RAG)** 100% locale in Python per l'interrogazione di documentazione tecnica, specifiche di requisito e manuali dispositivi CPE/FWA (`.docx`, `.pdf`, `.txt`), basato su **LangChain**, **ChromaDB** e **Ollama**.
-
----
-
-## Architettura del Progetto
-
-Il sistema è diviso in due fasi indipendenti:
-
-### 1. Indicizzazione Documenti (`ingest.py`)
-Legge i documenti presenti nella cartella `Documenti/`, li suddivide in frammenti (chunk) e genera i vettori numerici tramite il modello di embedding locale **`nomic-embed-text`** salvandoli in `chroma_db/`:
-- **File Word (`.docx`)**:
-  - I paragrafi di testo vengono divisi con `RecursiveCharacterTextSplitter` (`chunk_size=700`, `chunk_overlap=100`).
-  - Le **tabelle** vengono estratte riga per riga come documenti dedicati (`[Tabella]`), evitando che requisiti tecnici o parametri tabellari vengano spezzati a metà.
-- **File PDF (`.pdf`) e Testo (`.txt`)**: caricati tramite `PyPDFLoader` e `TextLoader` e suddivisi in chunk.
-- In questa fase il modello linguistico (`llama3.2`) non viene caricato in RAM.
-
-### 2. Interrogazione e Risposta (`app.py`)
-Riceve le domande dell'utente da terminale ed esegue un recupero ibrido prima di generare la risposta con **`llama3.2`** (`temperature=0`):
-1. **Riconoscimento automatico modello dispositivo**: identifica nella domanda sigle tecniche di modelli (es. `MF297D`, `NR7303`, `HH516V`) distinguendole da acronimi di protocollo (`TR-069`, `APN`, `CWMP`, `IPv4`, `FWA`, `CPE`), filtrando i soli documenti pertinenti al modello richiesto.
-2. **Esclusione copie e bozze**: scarta automaticamente file duplicati o temporanei (`_1`, `copy`, `copia`, `backup`, `bozza`, `draft`, `test`).
-3. **Ranking ibrido (Semantico + Lessicale)**: combina la distanza vettoriale di ChromaDB (`75%`) con uno score lessicale locale sui token della domanda (`25%`) e recupera anche eventuali match lessicali forti (`>= 60%`).
-4. **Citazione rigorosa delle fonti**: istruisce l'LLM a rispondere esclusivamente sulla base del contesto recuperato, citando per ogni affermazione o passaggio procedurale la fonte nel formato `[Fonte N]` ed elencando a fine risposta i documenti di riferimento deduplicati.
+A 100% local **Retrieval-Augmented Generation (RAG)** system built in Python for querying technical documentation, requirement specifications, and CPE/FWA device manuals (`.docx`, `.pdf`, `.txt`), powered by **LangChain**, **ChromaDB**, and **Ollama**.
 
 ---
 
-## Struttura della Repository
+## Architecture
+
+The workflow is divided into two independent stages:
+
+### 1. Document Ingestion (`ingest.py`)
+Reads source documents from the `Documenti/` folder, splits them into semantic chunks, generates numerical embeddings using the local **`nomic-embed-text`** model, and stores them persistently in `chroma_db/`:
+- **Word Documents (`.docx`)**:
+  - Regular paragraphs are split using `RecursiveCharacterTextSplitter` (`chunk_size=700`, `chunk_overlap=100`).
+  - **Tables** are extracted row-by-row as dedicated documents (`[Tabella]`), ensuring technical requirements and tabular parameters are never truncated mid-row.
+- **PDF (`.pdf`) and Text (`.txt`) Files**: loaded via `PyPDFLoader` and `TextLoader` and split into chunks.
+- During ingestion, the generative LLM (`llama3.2`) is never loaded into RAM.
+
+### 2. Hybrid Retrieval & Question Answering (`app.py`)
+Accepts user queries from the command line and performs hybrid retrieval before generating grounded responses with **`llama3.2`** (`temperature=0`):
+1. **Automatic Device Model Detection**: detects technical hardware model codes in the user query (e.g., `MF297D`, `NR7303`, `HH516V`) while distinguishing them from protocol acronyms (`TR-069`, `APN`, `CWMP`, `IPv4`, `FWA`, `CPE`), filtering context strictly to documents matching the target device.
+2. **Duplicate & Draft Exclusion**: automatically filters out duplicate or temporary files (`_1`, `copy`, `copia`, `backup`, `bozza`, `draft`, `test`) prior to context assembly.
+3. **Hybrid Ranking (Semantic + Lexical)**: combines ChromaDB vector similarity (`75%`) with a local lexical token-overlap score (`25%`), and supplements results with strong lexical matches (`>= 60%`).
+4. **Strict Source Grounding & Citations**: instructs the LLM to answer exclusively from the retrieved context, citing every technical statement or procedural step using `[Fonte N]` and listing deduplicated reference files at the end of each answer.
+
+---
+
+## Project Structure
 
 ```text
 RAG/
-├── app.py              # Assistente CLI interattivo (Retrieval ibrido + ChatOllama)
-├── ingest.py           # Pipeline di caricamento, chunking e indicizzazione su ChromaDB
-├── requirements.txt    # Dipendenze Python del progetto
-├── README.md           # Documentazione completa del progetto
-└── Documenti/          # Cartella in cui inserire i file .docx, .pdf, .txt da indicizzare
+├── app.py              # Interactive CLI assistant (Hybrid retrieval + ChatOllama)
+├── ingest.py           # Document loading, table-aware chunking, and ChromaDB indexing
+├── requirements.txt    # Python dependencies
+├── README.md           # Project documentation
+└── Documenti/          # Input directory for .docx, .pdf, and .txt files to index
 ```
 
 ---
 
-## Prerequisiti
+## Prerequisites
 
 1. **Python 3.10+**
-2. **[Ollama](https://ollama.com/)** installato e in esecuzione (`http://localhost:11434`).
-3. Scaricare i due modelli richiesti in Ollama:
+2. **[Ollama](https://ollama.com/)** installed and running locally (`http://localhost:11434`).
+3. Pull the required embedding and language models in Ollama:
    ```bash
    ollama pull nomic-embed-text
    ollama pull llama3.2
    ```
-   Per verificare che Ollama sia attivo e i modelli siano presenti:
+   Verify that Ollama is running and the models are available:
    ```bash
    ollama list
    curl http://localhost:11434
@@ -55,51 +55,51 @@ RAG/
 
 ---
 
-## Installazione e Avvio
+## Installation & Usage
 
-### Su Linux / macOS
+### Linux / macOS
 ```bash
-# 1. Clona il repository ed entra nella cartella
-git clone <URL_DEL_TUO_REPO_GITHUB>
+# 1. Clone the repository
+git clone <YOUR_GITHUB_REPO_URL>
 cd RAG
 
-# 2. Crea e attiva l'ambiente virtuale
+# 2. Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 3. Installa le dipendenze
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Inserisci i file (.docx, .pdf, .txt) nella cartella Documenti/ e avvia l'indicizzazione
+# 4. Place your documents (.docx, .pdf, .txt) inside Documenti/ and run ingestion
 python ingest.py
 
-# 5. Avvia l'assistente RAG
+# 5. Launch the interactive RAG assistant
 python app.py
 ```
 
-### Su Windows (PowerShell / CMD)
+### Windows (PowerShell / CMD)
 ```bat
 cd RAG
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 
-:: Indicizza i documenti presenti in Documenti\
+:: Index documents located in Documenti\
 python ingest.py
 
-:: Avvia l'assistente interattivo
+:: Start the interactive CLI assistant
 python app.py
 ```
 
 ---
 
-## Variabili d'Ambiente Opzionali
+## Optional Environment Variables
 
-I percorsi e i modelli sono configurati automaticamente in modo relativo alla cartella del progetto, ma possono essere personalizzati tramite variabili d'ambiente:
+Paths and model names default to relative project paths, but can be overridden via environment variables:
 
-| Variabile | Default | Descrizione |
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `RAG_DOCS_DIR` | `./Documenti` | Percorso della cartella contenente i documenti da indicizzare |
-| `RAG_DB_PATH` | `./chroma_db` | Percorso del database vettoriale ChromaDB |
-| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Modello Ollama usato per gli embedding |
-| `OLLAMA_LLM_MODEL` | `llama3.2` | Modello Ollama usato per generare le risposte |
+| `RAG_DOCS_DIR` | `./Documenti` | Path to the directory containing source documents to index |
+| `RAG_DB_PATH` | `./chroma_db` | Path to the persistent ChromaDB vector store |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Ollama model used for generating embeddings |
+| `OLLAMA_LLM_MODEL` | `llama3.2` | Ollama model used for generating answers |
